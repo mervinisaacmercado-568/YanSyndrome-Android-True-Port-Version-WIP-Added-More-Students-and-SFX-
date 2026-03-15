@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>YanSyndrome Android (Yansim Android Port)</title>
+    <title>YanSyndrome</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; touch-action: none; -webkit-user-select: none; }
         #renderCanvas { width: 100%; height: 100%; touch-action: none; outline: none; display: block; }
@@ -26,6 +26,7 @@
         #clock { position: absolute; top: 20px; right: 20px; color: #ff85a1; text-align: right; text-shadow: 2px 2px 3px #000; font-weight: 900; }
         #clock .time { font-size: 45px; }
 
+        /* Sanity Bar Styles */
         #sanity-container {
             position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
             width: 200px; height: 15px; background: rgba(0,0,0,0.5);
@@ -90,7 +91,7 @@
             <p style="color: #333; margin: 0; font-weight: bold;">Unity Port Simulator</p>
         </div>
         <button id="start-btn">START PORT</button>
-        <p style="color: #888; font-size: 11px; margin-top: 20px;">Cookies Cream Build - v0.8.3-DEV</p>
+        <p style="color: #888; font-size: 11px; margin-top: 20px;">Cookies Cream Build — v0.8.2-DEV</p>
     </div>
 
     <div id="blood-overlay"></div>
@@ -164,7 +165,11 @@
             }
             dynamicTexture.update();
             mat.diffuseTexture = dynamicTexture;
-            if(isCeiling) { mat.backFaceCulling = false; mat.emissiveColor = new BABYLON.Color3(0.6, 0.6, 0.6); }
+            
+            if(isCeiling) { 
+                mat.backFaceCulling = false; 
+                mat.emissiveColor = new BABYLON.Color3(0.6, 0.6, 0.6);
+            }
             return mat;
         }
 
@@ -172,12 +177,23 @@
             const particleSystem = new BABYLON.ParticleSystem("particles", 200, scene);
             particleSystem.particleTexture = new BABYLON.Texture("https://raw.githubusercontent.com/PatrickRyanMS/BabylonJS-Assets/master/Particles/Texture/Flare.png", scene);
             particleSystem.emitter = position;
+            particleSystem.minEmitBox = new BABYLON.Vector3(-0.5, 0, -0.5);
+            particleSystem.maxEmitBox = new BABYLON.Vector3(0.5, 0.5, 0.5);
             particleSystem.color1 = new BABYLON.Color4(0.7, 0, 0, 1.0);
             particleSystem.color2 = new BABYLON.Color4(0.5, 0, 0, 1.0);
+            particleSystem.colorDead = new BABYLON.Color4(0, 0, 0, 0.0);
             particleSystem.minSize = 0.1;
             particleSystem.maxSize = 0.3;
+            particleSystem.minLifeTime = 0.3;
+            particleSystem.maxLifeTime = 1.0;
             particleSystem.emitRate = 500;
+            particleSystem.blendMode = BABYLON.ParticleSystem.BLENDMODE_ONEONE;
             particleSystem.gravity = new BABYLON.Vector3(0, -9.81, 0);
+            particleSystem.direction1 = new BABYLON.Vector3(-1, 8, 1);
+            particleSystem.direction2 = new BABYLON.Vector3(1, 8, -1);
+            particleSystem.minEmitPower = 1;
+            particleSystem.maxEmitPower = 3;
+            particleSystem.updateSpeed = 0.025;
             particleSystem.targetStopDuration = 0.2;
             particleSystem.disposeOnStop = true;
             particleSystem.start();
@@ -201,23 +217,37 @@
         const createHuman = (name, displayName, x, z, hairColor, isAyano = false) => {
             const container = new BABYLON.Mesh(name + "Origin", scene);
             container.position.set(x, 0, z);
+            
             const skinMat = new BABYLON.StandardMaterial(name+"skin", scene); skinMat.diffuseColor = new BABYLON.Color3(1, 0.85, 0.8);
             const shirtMat = new BABYLON.StandardMaterial(name+"shirt", scene); shirtMat.diffuseColor = new BABYLON.Color3(0.95, 0.95, 1);
             const skirtMat = new BABYLON.StandardMaterial(name+"skirt", scene); skirtMat.diffuseColor = new BABYLON.Color3(0.1, 0.15, 0.4);
             const hMat = new BABYLON.StandardMaterial(name+"hair", scene); hMat.diffuseColor = hairColor;
+
             const torso = BABYLON.MeshBuilder.CreateCylinder(name + "torso", {diameter: 0.8, height: 1.4}, scene);
             torso.parent = container; torso.position.y = 1.2; torso.material = shirtMat;
+            
             const skirt = BABYLON.MeshBuilder.CreateCylinder(name + "skirt", {diameterTop: 0.8, diameterBottom: 1.4, height: 0.8}, scene);
             skirt.parent = container; skirt.position.y = 0.5; skirt.material = skirtMat;
+            
             const head = BABYLON.MeshBuilder.CreateSphere(name + "head", {diameter: 0.85}, scene);
             head.parent = container; head.position.y = 2.3; head.material = skinMat;
+            
             const hair = BABYLON.MeshBuilder.CreateSphere(name + "hair", {diameter: 0.92}, scene);
             hair.parent = head; hair.position.y = 0.1; hair.material = hMat; hair.scaling.y = 0.85;
+
             if(isAyano) {
                 const ponytail = BABYLON.MeshBuilder.CreateCylinder("ponytail", {diameterTop: 0.4, diameterBottom: 0.1, height: 1.2}, scene);
-                ponytail.parent = head; ponytail.position.set(0, 0, -0.45); ponytail.rotation.x = -0.7; ponytail.material = hMat;
-            } else { createNameTag(displayName, container, scene); }
-            container.checkCollisions = true; container.ellipsoid = new BABYLON.Vector3(0.5, 1.2, 0.5); container.isAlive = true; container.hairMat = hMat;
+                ponytail.parent = head; ponytail.position.set(0, 0, -0.45);
+                ponytail.rotation.x = -0.7; ponytail.material = hMat;
+            } else {
+                createNameTag(displayName, container, scene);
+            }
+            
+            container.checkCollisions = true;
+            container.ellipsoid = new BABYLON.Vector3(0.5, 1.2, 0.5);
+            container.ellipsoidOffset = new BABYLON.Vector3(0, 1.2, 0);
+            container.isAlive = true;
+            container.hairMat = hMat;
             return container;
         };
 
@@ -225,9 +255,20 @@
             const bar = document.getElementById('sanity-bar');
             const overlay = document.getElementById('blood-overlay');
             bar.style.width = sanity + '%';
-            if (sanity > 60) { bar.style.backgroundColor = '#ff1493'; overlay.classList.remove('low-sanity-pulse'); }
-            else if (sanity > 30) { bar.style.backgroundColor = '#8b0000'; overlay.classList.remove('low-sanity-pulse'); }
-            else { bar.style.backgroundColor = '#000'; overlay.classList.add('low-sanity-pulse'); }
+            
+            if (sanity > 60) {
+                bar.style.backgroundColor = '#ff1493';
+                overlay.classList.remove('low-sanity-pulse');
+                overlay.style.display = 'none';
+            } else if (sanity > 30) {
+                bar.style.backgroundColor = '#8b0000';
+                overlay.classList.remove('low-sanity-pulse');
+                overlay.style.display = 'block';
+            } else {
+                bar.style.backgroundColor = '#000';
+                overlay.classList.add('low-sanity-pulse');
+                overlay.style.display = 'block';
+            }
         };
 
         const createScene = function () {
@@ -235,10 +276,20 @@
             scene.clearColor = new BABYLON.Color4(0.8, 0.9, 1.0, 1);
             scene.collisionsEnabled = true;
             scene.gravity = new BABYLON.Vector3(0, -0.15, 0);
+
             const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0.5, 1, 0.2), scene);
+            light.intensity = 0.8;
+            
+            const dirLight = new BABYLON.DirectionalLight("dir01", new BABYLON.Vector3(-1, -2, -1), scene);
+            dirLight.position = new BABYLON.Vector3(20, 40, 20);
+            dirLight.intensity = 0.5;
+
             const floorMat = createTexturedMaterial("floor", "tiles", "#fdfdfd", "#dddddd");
             const wallMat = createTexturedMaterial("wall", "bricks", "#ffffff", "#dcdcdc");
             const woodMat = createTexturedMaterial("wood", "tiles", "#8d6e63", "#5d4037");
+            const firstFloorCeilMat = createTexturedMaterial("ceil_f1", "tiles", "#ffffff", "#eeeeee", true);
+            const roofCeilMat = createTexturedMaterial("ceil_roof", "tiles", "#ffffff", "#cccccc", true);
+
             const ground = BABYLON.MeshBuilder.CreateGround("ground", {width: 1000, height: 1000}, scene);
             ground.material = createTexturedMaterial("grass", "tiles", "#81c784", "#66bb6a");
             ground.checkCollisions = true;
@@ -249,28 +300,74 @@
                 return box;
             };
 
+            // School Base
             createBox("mainFloor1", 160, 0.4, 240, 0, 0.2, -50, floorMat);
             createBox("weaponWall", 40, 12, 1, 45, 6, -20);
-            const door = BABYLON.MeshBuilder.CreateBox("door", {width: 5, height: 7, depth: 0.5}, scene);
-            door.position.set(30, 3.5, -20); door.material = woodMat; doors.push(door);
+            createBox("roomWallL", 1, 12, 60, 25, 6, -50);
+            createBox("sideWallL", 1, 12, 240, -80, 6, -50);
+            createBox("sideWallR", 1, 12, 240, 80, 6, -50);
 
+            const door = BABYLON.MeshBuilder.CreateBox("door", {width: 5, height: 7, depth: 0.5}, scene);
+            door.position.set(30, 3.5, -20); door.material = woodMat;
+            doors.push(door);
+
+            // Stairs
+            const totalSteps = 35;
+            const stepYInc = 0.35;
+            const stepZInc = 0.95;
+            for(let i=0; i < totalSteps; i++) {
+                const step = BABYLON.MeshBuilder.CreateBox("step", {width: 12, height: 0.6, depth: 1.4}, scene);
+                step.position.set(0, 0.3 + (i * stepYInc), 15 - (i * stepZInc));
+                step.material = wallMat; step.checkCollisions = true;
+            }
+
+            const f2Y = 0.3 + (totalSteps * stepYInc);
+            const holeZStart = 15 - (totalSteps * stepZInc);
+
+            createBox("f2_left", 75, 0.2, 240, -42.5, f2Y, -50, floorMat);
+            createBox("f2_right", 75, 0.2, 240, 42.5, f2Y, -50, floorMat);
+            createBox("f2_front", 15, 0.2, 80, 0, f2Y, holeZStart - 40, floorMat);
+            createBox("f2_back", 15, 0.2, 40, 0, f2Y, 35, floorMat);
+
+            const f1CeilY = f2Y - 0.15;
+            const c1l = createBox("ceil1_left", 75, 0.1, 240, -42.5, f1CeilY, -50, firstFloorCeilMat);
+            const c1r = createBox("ceil1_right", 75, 0.1, 240, 42.5, f1CeilY, -50, firstFloorCeilMat);
+            const c1f = createBox("ceil1_front", 15, 0.1, 80, 0, f1CeilY, holeZStart - 40, firstFloorCeilMat);
+            const c1b = createBox("ceil1_back", 15, 0.1, 40, 0, f1CeilY, 35, firstFloorCeilMat);
+            [c1l, c1r, c1f, c1b].forEach(c => c.checkCollisions = false);
+
+            const roofY = 25;
+            createBox("roof_left", 75, 0.1, 240, -42.5, roofY, -50, roofCeilMat);
+            createBox("roof_right", 75, 0.1, 240, 42.5, roofY, -50, roofCeilMat);
+            createBox("roof_front", 15, 0.1, 80, 0, roofY, holeZStart - 40, roofCeilMat);
+            createBox("roof_back", 15, 0.1, 40, 0, roofY, 35, roofCeilMat);
+
+            // Knife
             knifeItem = BABYLON.MeshBuilder.CreateBox("knife", {width: 0.1, height: 0.5, depth: 0.1}, scene);
             const blade = BABYLON.MeshBuilder.CreateBox("blade", {width: 0.05, height: 0.8, depth: 0.18}, scene);
             blade.parent = knifeItem; blade.position.y = 0.6;
-            const steelMat = new BABYLON.StandardMaterial("steel", scene); steelMat.emissiveColor = new BABYLON.Color3(0.8, 0.8, 0.9);
+            const steelMat = new BABYLON.StandardMaterial("steel", scene); 
+            steelMat.emissiveColor = new BABYLON.Color3(0.8, 0.8, 0.9);
+            steelMat.specularColor = new BABYLON.Color3(1, 1, 1);
             blade.material = steelMat; knifeItem.position.set(45, 1.5, -45);
 
+            // Students
             const npcData = [
                 { name: "Kokona", x: -20, z: 40, color: new BABYLON.Color3(1, 0.4, 1) },
                 { name: "Saki", x: 0, z: 45, color: new BABYLON.Color3(0.4, 0.6, 1) },
-                { name: "Yui", x: 20, z: 40, color: new BABYLON.Color3(1, 0, 0) }
+                { name: "Yui", x: 20, z: 40, color: new BABYLON.Color3(1, 0, 0) },
+                { name: "Mei", x: -40, z: 30, color: new BABYLON.Color3(0, 0, 1) },
+                { name: "Koharu", x: 40, z: 30, color: new BABYLON.Color3(0, 1, 0) }
             ];
             npcData.forEach((data, i) => {
                 const s = createHuman("Student"+i, data.name, data.x, data.z, data.color);
-                s.nextMove = 0; s.targetPos = s.position.clone(); students.push(s);
+                s.nextMove = 0; s.targetPos = s.position.clone();
+                students.push(s);
             });
 
             player = createHuman("Ayano", "Ayano", 0, 60, new BABYLON.Color3(0.1, 0.1, 0.1), true);
+            player.position.y = 5;
+
             camera = new BABYLON.TargetCamera("camera", BABYLON.Vector3.Zero(), scene);
             setupControls();
             return scene;
@@ -286,56 +383,114 @@
 
             const handleJoy = (t) => {
                 const rect = joyBase.getBoundingClientRect();
-                const dx = t.clientX - (rect.left + rect.width / 2);
-                const dy = t.clientY - (rect.top + rect.height / 2);
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                const dx = t.clientX - centerX;
+                const dy = t.clientY - centerY;
                 const dist = Math.min(Math.sqrt(dx*dx + dy*dy), 50);
                 const angle = Math.atan2(dy, dx);
+                
                 joyStick.style.left = (50 + (Math.cos(angle) * dist / rect.width * 100)) + '%';
                 joyStick.style.top = (50 + (Math.sin(angle) * dist / rect.height * 100)) + '%';
-                inputX = Math.cos(angle) * (dist / 50); inputZ = -Math.sin(angle) * (dist / 50);
+                
+                inputX = Math.cos(angle) * (dist / 50);
+                inputZ = -Math.sin(angle) * (dist / 50);
             };
 
             joyBase.addEventListener('touchstart', (e) => { moveActive = true; handleJoy(e.targetTouches[0]); e.preventDefault(); }, {passive: false});
+            
             window.addEventListener('touchmove', (e) => {
                 for(let t of e.changedTouches) {
-                    if(t.clientX < window.innerWidth / 2) { handleJoy(t); }
-                    else { camYaw += (t.clientX - lastTouchX) * 0.008; camPitch = Math.max(-0.4, Math.min(0.6, camPitch + (t.clientY - lastTouchY) * 0.008)); lastTouchX = t.clientX; lastTouchY = t.clientY; }
+                    if(t.clientX < window.innerWidth / 2) { 
+                        handleJoy(t); 
+                    } else {
+                        camYaw += (t.clientX - lastTouchX) * 0.008;
+                        camPitch = Math.max(-0.4, Math.min(0.6, camPitch + (t.clientY - lastTouchY) * 0.008));
+                        lastTouchX = t.clientX; lastTouchY = t.clientY;
+                    }
                 }
             }, {passive: false});
-            window.addEventListener('touchstart', (e) => { for(let t of e.changedTouches) if(t.clientX > window.innerWidth / 2) { lastTouchX = t.clientX; lastTouchY = t.clientY; } });
-            window.addEventListener('touchend', (e) => { for(let t of e.changedTouches) if(t.clientX < window.innerWidth / 2) { moveActive = false; inputX = 0; inputZ = 0; joyStick.style.left = '50%'; joyStick.style.top = '50%'; } });
-            
+
+            window.addEventListener('touchstart', (e) => { 
+                for(let t of e.changedTouches) { 
+                    if(t.clientX > window.innerWidth / 2) { 
+                        lastTouchX = t.clientX; lastTouchY = t.clientY; 
+                    } 
+                } 
+            });
+
+            window.addEventListener('touchend', (e) => {
+                for(let t of e.changedTouches) { 
+                    if(t.clientX < window.innerWidth / 2) { 
+                        moveActive = false; inputX = 0; inputZ = 0; 
+                        joyStick.style.left = '50%'; joyStick.style.top = '50%'; 
+                    } 
+                }
+            });
+
             sprintBtn.addEventListener('touchstart', (e) => { isSprinting = true; sprintBtn.classList.add('active'); e.preventDefault(); });
             sprintBtn.addEventListener('touchend', () => { isSprinting = false; sprintBtn.classList.remove('active'); });
 
             pickupBtn.addEventListener('touchstart', (e) => {
-                if(knifeItem && !isHoldingKnife) { isHoldingKnife = true; knifeItem.parent = player; knifeItem.position.set(0.7, 1.4, 0.5); knifeItem.rotation.x = Math.PI/2; }
+                if(knifeItem && !isHoldingKnife) {
+                    isHoldingKnife = true;
+                    knifeItem.parent = player;
+                    knifeItem.position.set(0.7, 1.4, 0.5);
+                    knifeItem.rotation.x = Math.PI/2;
+                    pickupBtn.style.transform = "scale(0.8)";
+                    setTimeout(() => pickupBtn.style.transform = "scale(1)", 100);
+                }
                 e.preventDefault();
             });
 
             killBtn.addEventListener('touchstart', (e) => {
                 if(!isHoldingKnife) return;
-                let killed = false;
+                let killedCount = 0;
                 students.forEach(s => {
-                    if(BABYLON.Vector3.Distance(player.position, s.position) < 6 && s.isAlive) {
-                        s.isAlive = false; s.rotation.x = Math.PI / 2.1; s.position.y = 0.6;
+                    const d = BABYLON.Vector3.Distance(player.position, s.position);
+                    if(d < 6 && s.isAlive) {
+                        s.isAlive = false; 
+                        s.rotation.x = Math.PI / 2.1; 
+                        s.position.y = 0.6;
                         s.hairMat.diffuseColor = new BABYLON.Color3(0.2, 0.1, 0.1);
+                        s.getChildMeshes().forEach(m => { if(m.name === "nameTag") m.dispose(); });
+                        
                         createBloodEffect(s.position.clone().add(new BABYLON.Vector3(0, 1, 0)));
-                        knifeSfx.currentTime = 0; knifeSfx.play().catch(err => {});
-                        screamSfx.currentTime = 0; screamSfx.play().catch(err => {});
-                        sanity = Math.max(0, sanity - 25); killed = true;
+                        
+                        knifeSfx.currentTime = 0;
+                        knifeSfx.play().catch(err => {});
+                        
+                        screamSfx.currentTime = 0;
+                        screamSfx.play().catch(err => {});
+
+                        killedCount++;
+                        sanity = Math.max(0, sanity - 20);
+                        updateSanityUI();
                     }
                 });
-                if(killed) { updateSanityUI(); document.getElementById('blood-overlay').style.display = 'block'; setTimeout(() => { if (sanity > 30) document.getElementById('blood-overlay').style.display = 'none'; }, 150); }
+                
+                if(killedCount > 0) {
+                    const overlay = document.getElementById('blood-overlay');
+                    overlay.style.display = 'block';
+                    setTimeout(() => {
+                        if (sanity > 60) overlay.style.display = 'none';
+                    }, 200);
+                }
                 e.preventDefault();
             });
 
             laughBtn.addEventListener('touchstart', (e) => {
+                // Restore sanity
                 sanity = Math.min(100, sanity + 10);
                 updateSanityUI();
+                
+                // Sound
                 laughSfx.currentTime = 0;
                 laughSfx.play().catch(err => {});
-                camera.position.y += 0.2; setTimeout(() => camera.position.y -= 0.2, 100);
+
+                // Small screen shake/laugh effect
+                camera.position.y += 0.2;
+                setTimeout(() => camera.position.y -= 0.2, 50);
                 e.preventDefault();
             });
         }
@@ -343,7 +498,15 @@
         document.getElementById('start-btn').addEventListener('click', () => {
             document.getElementById('splash').style.display = 'none';
             updateSanityUI();
+            
+            // Note: External music URL might be blocked by browser CORS if not from specific domains
+            bgMusic = new Audio("https://static.wikia.nocookie.net/yandere-simulator/images/2/2e/1_MaxAtmosphereFullSanity.mp3");
+            bgMusic.loop = true;
+            bgMusic.volume = 0.4;
+            bgMusic.play().catch(e => console.log("Audio play failed"));
+
             createScene();
+            
             engine.runRenderLoop(() => {
                 if(player) {
                     if(moveActive) {
@@ -351,24 +514,45 @@
                         const moveAngle = Math.atan2(inputX, inputZ) + camYaw;
                         player.moveWithCollisions(new BABYLON.Vector3(Math.sin(moveAngle) * speed, 0, Math.cos(moveAngle) * speed).add(scene.gravity));
                         player.rotation.y = moveAngle;
-                    } else player.moveWithCollisions(scene.gravity);
+                    } else { 
+                        player.moveWithCollisions(scene.gravity); 
+                    }
 
                     students.forEach(s => {
                         if(!s.isAlive) return;
-                        if(Date.now() > s.nextMove) { s.targetPos = new BABYLON.Vector3(Math.random()*100-50, s.position.y, Math.random()*80-20); s.nextMove = Date.now() + 3000 + Math.random()*5000; }
+                        if(Date.now() > s.nextMove) {
+                            s.targetPos = new BABYLON.Vector3(Math.random()*100-50, s.position.y, Math.random()*80-20);
+                            s.nextMove = Date.now() + 3000 + Math.random()*5000;
+                        }
                         const dir = s.targetPos.subtract(s.position);
-                        if(dir.length() > 0.8) { s.moveWithCollisions(dir.normalize().scale(0.08).add(scene.gravity)); s.lookAt(s.targetPos); }
+                        if(dir.length() > 0.8) {
+                            s.moveWithCollisions(dir.normalize().scale(0.08).add(scene.gravity));
+                            s.lookAt(s.targetPos);
+                        }
                     });
 
-                    document.getElementById('pickup-btn').style.display = (!isHoldingKnife && BABYLON.Vector3.Distance(player.position, knifeItem.position) < 6) ? 'flex' : 'none';
-                    document.getElementById('kill-btn').style.display = (isHoldingKnife && students.some(s => s.isAlive && BABYLON.Vector3.Distance(player.position, s.position) < 7)) ? 'flex' : 'none';
-                    doors.forEach(door => door.position.y = BABYLON.Scalar.Lerp(door.position.y, BABYLON.Vector3.Distance(player.position, door.position) < 8 ? 10.5 : 3.5, 0.1));
-                    camera.position.x = player.position.x - Math.sin(camYaw) * 12; camera.position.z = player.position.z - Math.cos(camYaw) * 12;
-                    camera.position.y = player.position.y + 4.5 + (camPitch * 10); camera.setTarget(new BABYLON.Vector3(player.position.x, player.position.y + 2.5, player.position.z));
+                    const dKnife = BABYLON.Vector3.Distance(player.position, knifeItem.position);
+                    document.getElementById('pickup-btn').style.display = (!isHoldingKnife && dKnife < 6) ? 'flex' : 'none';
+                    
+                    let nearAny = students.some(s => s.isAlive && BABYLON.Vector3.Distance(player.position, s.position) < 7);
+                    document.getElementById('kill-btn').style.display = (isHoldingKnife && nearAny) ? 'flex' : 'none';
+
+                    doors.forEach(door => {
+                        const dist = BABYLON.Vector3.Distance(player.position, door.position);
+                        const targetY = dist < 8 ? 10.5 : 3.5;
+                        door.position.y = BABYLON.Scalar.Lerp(door.position.y, targetY, 0.1);
+                    });
+
+                    const camDist = 12;
+                    camera.position.x = player.position.x - Math.sin(camYaw) * camDist;
+                    camera.position.z = player.position.z - Math.cos(camYaw) * camDist;
+                    camera.position.y = player.position.y + 4.5 + (camPitch * 10);
+                    camera.setTarget(new BABYLON.Vector3(player.position.x, player.position.y + 2.5, player.position.z));
                 }
                 scene.render();
             });
         });
+
         window.addEventListener("resize", () => engine.resize());
     </script>
 </body>
